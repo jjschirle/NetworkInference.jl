@@ -2,3 +2,10 @@
 *.jl.*.cov
 *.jl.mem
 /Manifest.toml
+
+Project.toml
+/Project.toml
+
+# macOS
+.DS_Store
+**/.DS_Store
