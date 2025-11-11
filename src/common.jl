@@ -16,6 +16,19 @@ struct Node
     probabilities::Array{Float64}
 end
 
+# --- PIDC configuration -------------------------------------------
+Base.@kwdef struct PIDCConfig
+    n_threads::Int = Threads.nthreads()         # reserved for adjusting threading vs processing
+    batch_size_genes::Int = 1500                # MI tiling (0 -> legacy path)
+    triplet_block_k::Int = 2000                 # PUC k-chunk size (0 -> legacy)
+    topk_edges::Int = 0                         # 0 = keep all
+    discretizer::String = "bayesian_blocks"     # mirrors existing default
+    estimator::String = "maximum_likelihood"    # mirrors existing default
+    dpi_hybrid::Bool = false                    # May not touch
+    dpi_gamma::Float64 = 0.0                    # May not touch
+end
+
+
 # Constructs a Node from a line of a data file. line should be an array with
 # the label as the first element, then the raw data values.
 function Node(line::AbstractArray, discretizer, estimator, number_of_bins)

@@ -24,6 +24,8 @@ export
     read_network_file,
     get_adjacency_matrix,
     infer_network
+    # New addition
+    PIDCConfig
 
 include("common.jl")
 include("network_inference.jl")

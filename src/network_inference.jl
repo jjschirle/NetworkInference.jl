@@ -48,7 +48,7 @@ function get_joint_probabilities(node1, node2, estimator)
 end
 
 # Gets the mutual information between all pairs of Nodes.
-function get_mi_scores(nodes, number_of_nodes, estimator, base)
+function get_mi_scores(nodes, number_of_nodes, estimator, base; config::PIDCConfig = PIDCConfig())
 
     function get_mi(node1, node2, i, j, base, mi_scores)
         probabilities, probabilities1, probabilities2 = get_joint_probabilities(node1, node2, estimator)
@@ -70,7 +70,7 @@ function get_mi_scores(nodes, number_of_nodes, estimator, base)
 end
 
 # Gets the proportional unique contribution between all pairs of Nodes.
-function get_puc_scores(nodes, number_of_nodes, estimator, base)
+function get_puc_scores(nodes, number_of_nodes, estimator, base; config::PIDCConfig = PIDCConfig())
 
     function get_mi_and_si(node1, node2, base) # Mutual information and specific information
         probabilities, probabilities1, probabilities2 = get_joint_probabilities(node1, node2, estimator)
@@ -198,18 +198,16 @@ end
 # the joint distributions are estimated using other estimators, this assumption is
 # violated for PUC and PIDC in get_puc and get_joint_probabilities.)
 # - base: base for the information measures
-function InferredNetwork(inference::AbstractNetworkInference, nodes::Array{Node}; estimator = "maximum_likelihood", base = 2)
+function InferredNetwork(inference::AbstractNetworkInference, nodes::Array{Node}; estimator = "maximum_likelihood", base = 2, config::PIDCConfig = PIDCConfig())
 
     # Constants and containers
     number_of_nodes = length(nodes)
     edges = Array{Edge}(undef, binomial(number_of_nodes, 2))
 
-    # Get the raw scores
-    if get_puc(inference)
-        scores = get_puc_scores(nodes, number_of_nodes, estimator, base)
-    else
-        scores = get_mi_scores(nodes, number_of_nodes, estimator, base)
-    end
+    # Get the raw scores (Unchanged logic; just forward config)
+    scores = get_puc(inference) ?
+        get_puc_scores(nodes, number_of_nodes, estimator, base; config = config) :
+        get_mi_scores(nodes, number_of_nodes, estimator, base; config = config)
 
     # Apply context if necessary
     if apply_context(inference)

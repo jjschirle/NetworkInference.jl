@@ -178,7 +178,7 @@ The "maximum_likelihood" estimator is recommended for PUC and PIDC.
 """
 function infer_network(data_file_path::String, inference::AbstractNetworkInference; delim::Union{Char,Bool} = false,
     discretizer = "bayesian_blocks", estimator = "maximum_likelihood", number_of_bins = 10, base = 2,
-    out_file_path = "")
+    out_file_path = "", config::PIDCConfig = PIDCConfig())
 
     println("Getting nodes...")
     nodes = get_nodes(
@@ -190,7 +190,7 @@ function infer_network(data_file_path::String, inference::AbstractNetworkInferen
     )
 
     println("Inferring network...")
-    inferred_network = InferredNetwork(inference, nodes, estimator = estimator, base = base)
+    inferred_network = InferredNetwork(inference, nodes, estimator = estimator, base = base, config = config) # Calling without config behave as before
 
     if length(out_file_path) > 1
         println("Writing network to file...")

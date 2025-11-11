@@ -65,3 +65,11 @@ end
     @info "Toy timings (s)" first=t1.time second=t2.time
     @info "Toy allocations (bytes)" first=t1.bytes second=t2.bytes
 end
+
+@testset "Config is backward compatible" begin
+    data_file = joinpath(dirname(@__FILE__), "data", "toy_1k_200.txt")
+    nodes = get_nodes(data_file)
+    net1 = InferredNetwork(PIDCNetworkInference(), nodes)
+    net2 = InferredNetwork(PIDCNetworkInference(), nodes; config = PIDCConfig())
+    @test net1.edges[1].weight == net2.edges[1].weight
+end
