@@ -24,10 +24,10 @@ export
     read_network_file,
     get_adjacency_matrix,
     infer_network
-    # New addition
-    PIDCConfig
 
 include("common.jl")
+export PIDCConfig # New addition
+
 include("network_inference.jl")
 include("infer_network.jl")
 include("empirical_bayes_glue.jl")
