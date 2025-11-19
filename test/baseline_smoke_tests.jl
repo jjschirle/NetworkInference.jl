@@ -73,3 +73,26 @@ end
     net2 = InferredNetwork(PIDCNetworkInference(), nodes; config = PIDCConfig())
     @test net1.edges[1].weight == net2.edges[1].weight
 end
+
+@testset "Toy 1kx200 determinism + timings" begin
+    # Use the same data dir constant as above
+    toy_path = joinpath(DATA_DIR, "toy_1k_200.txt")
+
+    # Legacy config: no MI tiling, no PUC block optimizations
+    cfg_legacy  = PIDCConfig(batch_size_genes = 0,  triplet_block_k = 0)
+
+    # Batched MI only (same PUC behavior as legacy)
+    cfg_batched = PIDCConfig(batch_size_genes = 64, triplet_block_k = 0)
+
+    # Legacy timing
+    t_legacy = @timed run_all_networks(toy_path; config = cfg_legacy)
+
+    # Batched MI timing
+    t_batched = @timed run_all_networks(toy_path; config = cfg_batched)
+
+    @info "Toy legacy vs batched timings (s)" legacy = t_legacy.time batched = t_batched.time
+    @info "Toy legacy vs batched allocations (bytes)" legacy = t_legacy.bytes batched = t_batched.bytes
+
+    # No assertion here: this is a performance *probe*, not a correctness test.
+    # We'll use it to guide tuning on larger, realistic datasets.
+end

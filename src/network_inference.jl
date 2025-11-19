@@ -148,7 +148,7 @@ function get_weights(inference, scores, number_of_nodes, nodes)
         try
             weights[i, j] = cdf(fit(Gamma, scores_i), score) + cdf(fit(Gamma, scores_j), score)
         catch
-            println(string("Gamma distribution failed for ", nodes[i].label, " and ", nodes[j].label, "; used normal instead."))
+            # println(string("Gamma distribution failed for ", nodes[i].label, " and ", nodes[j].label, "; used normal instead."))
             apply_clr_context(i, j, score, scores_i, scores_j, weights)
         end
     end
