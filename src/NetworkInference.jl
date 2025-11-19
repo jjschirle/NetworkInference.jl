@@ -29,6 +29,7 @@ include("common.jl")
 export PIDCConfig # New addition
 
 include("mi_batched.jl")
+include("puc_full.jl")
 include("network_inference.jl")
 include("infer_network.jl")
 include("empirical_bayes_glue.jl")

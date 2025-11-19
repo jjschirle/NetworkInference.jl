@@ -78,62 +78,15 @@ function get_mi_scores(nodes, number_of_nodes, estimator, base; config::PIDCConf
 end
 
 # Gets the proportional unique contribution between all pairs of Nodes.
-function get_puc_scores(nodes, number_of_nodes, estimator, base; config::PIDCConfig = PIDCConfig())
+function get_puc_scores(nodes, number_of_nodes, estimator, base;
+    config::PIDCConfig = PIDCConfig())
 
-    function get_mi_and_si(node1, node2, base) # Mutual information and specific information
-        probabilities, probabilities1, probabilities2 = get_joint_probabilities(node1, node2, estimator)
-        mi = apply_mutual_information_formula(probabilities, probabilities1, probabilities2, base)
-        si1 = apply_specific_information_formula(probabilities, probabilities1, probabilities2, 1, base)
-        si2 = apply_specific_information_formula(probabilities, probabilities2, probabilities1, 2, base)
-        return (mi, si1, si2)
-    end
-
-    function get_node_pairs(node1, node2, i, j, base)
-        mi, si1, si2 = get_mi_and_si(node1, node2, base)
-        node_pairs[i, j] = NodePair(mi, si1)
-        node_pairs[j, i] = NodePair(mi, si2)
-    end
-
-    function increment_puc_scores(x, z, mi, redundancy, puc_scores)
-        puc_score = (mi - redundancy) / mi
-        puc_score = isfinite(puc_score) && puc_score >= 0 ? puc_score : zero(puc_score)
-        puc_scores[x, z] += puc_score
-        puc_scores[z, x] += puc_score
-    end
-
-    function get_puc(target, source1_target, source2_target, x, y, z, puc_scores)
-        redundancy = apply_redundancy_formula(
-            target.probabilities,
-            source1_target.si,
-            source2_target.si,
-            base
-        )
-        increment_puc_scores(x, z, source1_target.mi, redundancy, puc_scores)
-        increment_puc_scores(y, z, source2_target.mi, redundancy, puc_scores)
-    end
-
-    node_pairs = Array{NodePair}(undef, number_of_nodes, number_of_nodes)
-    puc_scores = SharedArray{Float64}(number_of_nodes, number_of_nodes)
-
-    for i in 1 : number_of_nodes
-        for j in i+1 : number_of_nodes
-            get_node_pairs(nodes[i], nodes[j], i, j, base)
-        end
-    end
-
-    @sync @distributed for i in 1 : number_of_nodes
-        for j in i+1 : number_of_nodes
-            for k in j+1 : number_of_nodes
-                get_puc(nodes[k], node_pairs[i, k], node_pairs[j, k], i, j, k, puc_scores)
-                get_puc(nodes[j], node_pairs[i, j], node_pairs[k, j], i, k, j, puc_scores)
-                get_puc(nodes[i], node_pairs[j, i], node_pairs[k, i], j, k, i, puc_scores)
-            end
-        end
-    end
-
-    return puc_scores
-
+    # Currently full, legacy PUC, no pruning.
+    # Later, when config.triplet_block_k > 0, we will route to a pruned/block-based
+    # implementation. For now, both paths use the same full implementation.
+    return compute_puc_full(nodes; estimator = estimator, base = base)
 end
+
 
 # Applies context to the raw edge weights.
 function get_weights(inference, scores, number_of_nodes, nodes)
