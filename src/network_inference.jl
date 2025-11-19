@@ -81,10 +81,13 @@ end
 function get_puc_scores(nodes, number_of_nodes, estimator, base;
     config::PIDCConfig = PIDCConfig())
 
-    # Currently full, legacy PUC, no pruning.
-    # Later, when config.triplet_block_k > 0, we will route to a pruned/block-based
-    # implementation. For now, both paths use the same full implementation.
-    return compute_puc_full(nodes; estimator = estimator, base = base)
+    if config.triplet_block_k <= 0
+        # Full legacy PUC
+        return compute_puc_full(nodes; estimator = estimator, base = base)
+    else
+        # Pruned, neighbor-based PUC
+        return compute_puc_pruned(nodes; estimator = estimator, base = base, config = config)
+    end
 end
 
 

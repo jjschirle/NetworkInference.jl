@@ -96,3 +96,48 @@ end
     # No assertion here: this is a performance *probe*, not a correctness test.
     # We'll use it to guide tuning on larger, realistic datasets.
 end
+
+@testset "Pruned PUC matches full when k >= n" begin
+    data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
+    nodes = get_nodes(data_file)
+
+    n = length(nodes)
+
+    cfg_full = PIDCConfig(triplet_block_k = 0)           # full PUC
+    cfg_big  = PIDCConfig(triplet_block_k = n,           # k >= n-1
+                          neighbor_mode = :union)
+
+    net_full = InferredNetwork(PIDCNetworkInference(), nodes; config = cfg_full)
+    net_big  = InferredNetwork(PIDCNetworkInference(), nodes; config = cfg_big)
+
+    @test length(net_full.edges) == length(net_big.edges)
+
+    # Check a subset of edges across the ordering
+    for idx in (1, 5, 10, 50, length(net_full.edges))
+        @test net_full.edges[idx].weight ≈ net_big.edges[idx].weight atol = 1e-8
+        @test Set(n.label for n in net_full.edges[idx].nodes) ==
+              Set(n.label for n in net_big.edges[idx].nodes)
+    end
+end
+
+@testset "Pruned PUC timing (toy 1k×200)" begin
+    data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
+    cfg_full   = PIDCConfig(triplet_block_k = 0)
+    cfg_pruned = PIDCConfig(triplet_block_k = 20, neighbor_mode = :union)
+
+    t_full = @timed begin
+        _mi, _clr, _puc, pidc_full = run_all_networks(data_file; config = cfg_full)
+        pidc_full
+    end
+
+    t_pruned = @timed begin
+        _mi, _clr, _puc, pidc_pruned = run_all_networks(data_file; config = cfg_pruned)
+        pidc_pruned
+    end
+
+    @info "PUC timing (toy)" full = t_full.time pruned = t_pruned.time
+    @info "PUC allocations (toy)" full = t_full.bytes pruned = t_pruned.bytes
+
+    # Soft assertion:
+    # @test t_pruned.time <= 1.2 * t_full.time
+end
