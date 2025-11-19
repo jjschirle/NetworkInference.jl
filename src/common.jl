@@ -19,7 +19,7 @@ end
 # --- PIDC configuration -------------------------------------------
 Base.@kwdef struct PIDCConfig
     n_threads::Int = Threads.nthreads()         # reserved for adjusting threading vs processing
-    batch_size_genes::Int = 1500                # MI tiling (0 -> legacy path)
+    batch_size_genes::Int = 0                   # MI tiling (0 -> legacy path), 0 = use original MI path by default
     triplet_block_k::Int = 2000                 # PUC k-chunk size (0 -> legacy)
     topk_edges::Int = 0                         # 0 = keep all
     discretizer::String = "bayesian_blocks"     # mirrors existing default
