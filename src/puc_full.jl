@@ -2,10 +2,12 @@
 #
 # Full, legacy PUC computation over all triplets (no pruning).
 # This is factored out so we can later add pruned / block-based variants.
+# Only change is outputting pairwise MI
 
 function compute_puc_full(nodes::Vector{Node};
     estimator::String = "maximum_likelihood",
-    base::Int = 2)
+    base::Int = 2,
+    config::PIDCConfig = PIDCConfig())
 
     number_of_nodes = length(nodes)
 
@@ -74,6 +76,21 @@ function compute_puc_full(nodes::Vector{Node};
         increment_puc_scores!(y, z, source2_target.mi, redundancy, puc_scores)
     end
 
+    # Turn NodePair cache into a dense MI matrix (symmetric).
+    function nodepairs_to_mi(node_pairs::Array{NodePair,2})
+        n = size(node_pairs, 1)
+        mi = zeros(Float64, n, n)
+        for i in 1:n
+            mi[i,i] = 0.0
+            for j in i+1:n
+                m = node_pairs[i,j].mi
+                mi[i,j] = m
+                mi[j,i] = m
+            end
+        end
+        return mi
+    end
+
     # --- Allocate caches -------------------------------------------------------
 
     node_pairs = Array{NodePair}(undef, number_of_nodes, number_of_nodes)
@@ -82,6 +99,10 @@ function compute_puc_full(nodes::Vector{Node};
     # --- pairwise MI + SI cache --------------------------------------
 
     fill_node_pairs!(node_pairs)
+
+    # --- Build full MI matrix from NodePair cache --------------------
+    
+    mi_scores = nodepairs_to_mi(node_pairs)
 
     # --- full triplet enumeration (legacy behavior) ------------------
 
@@ -98,5 +119,5 @@ function compute_puc_full(nodes::Vector{Node};
         end
     end
 
-    return puc_scores
+    return mi_scores, puc_scores
 end

@@ -16,7 +16,7 @@ function compute_puc_pruned(nodes::Vector{Node};
 
     # Fallback if pruning is disabled
     if k == 0
-        return compute_puc_full(nodes; estimator = estimator, base = base)
+        return compute_puc_full(nodes; estimator = estimator, base = base, config = config)
     end
 
     # --- build NodePair cache (MI + specific information) ------------
@@ -37,6 +37,21 @@ function compute_puc_pruned(nodes::Vector{Node};
         probabilities, probabilities2, probabilities1, 2, base)
 
         return mi, si1, si2
+    end
+
+    # Turn NodePair cache into a dense MI matrix (symmetric).
+    function nodepairs_to_mi(node_pairs::Array{NodePair,2})
+        n = size(node_pairs, 1)
+        mi = zeros(Float64, n, n)
+        for i in 1:n
+            mi[i,i] = 0.0
+            for j in i+1:n
+                m = node_pairs[i,j].mi
+                mi[i,j] = m
+                mi[j,i] = m
+            end
+        end
+        return mi
     end
 
     for i in 1:n
@@ -65,6 +80,10 @@ function compute_puc_pruned(nodes::Vector{Node};
         k_eff = min(k, length(mivals))
         neighbors[t] = [mivals[i][2] for i in 1:k_eff]
     end
+
+    # --- Build full MI matrix from NodePair cache --------------------
+    
+    mi_scores = nodepairs_to_mi(node_pairs)
 
     # --- allocate PUC scores ----------------------------------------
 
@@ -191,5 +210,5 @@ function compute_puc_pruned(nodes::Vector{Node};
         error("Unknown neighbor_mode = $(mode); expected :union or :target")
     end
 
-    return puc_scores
+    return mi_scores, puc_scores
 end

@@ -77,16 +77,25 @@ function get_mi_scores(nodes, number_of_nodes, estimator, base; config::PIDCConf
 
 end
 
-# Gets the proportional unique contribution between all pairs of Nodes.
+# # Gets the proportional unique contribution between all pairs of Nodes.
+# function get_puc_scores(nodes, number_of_nodes, estimator, base;
+#     config::PIDCConfig = PIDCConfig())
+
+#     if config.triplet_block_k <= 0
+#         # Full legacy PUC
+#         return compute_puc_full(nodes; estimator = estimator, base = base)
+#     else
+#         # Pruned, neighbor-based PUC
+#         return compute_puc_pruned(nodes; estimator = estimator, base = base, config = config)
+#     end
+# end
+
 function get_puc_scores(nodes, number_of_nodes, estimator, base;
     config::PIDCConfig = PIDCConfig())
-
-    if config.triplet_block_k <= 0
-        # Full legacy PUC
-        return compute_puc_full(nodes; estimator = estimator, base = base)
-    else
-        # Pruned, neighbor-based PUC
+    if config.triplet_block_k > 0
         return compute_puc_pruned(nodes; estimator = estimator, base = base, config = config)
+    else
+        return compute_puc_full(nodes; estimator = estimator, base = base, config = config)
     end
 end
 
@@ -168,11 +177,26 @@ function InferredNetwork(inference::AbstractNetworkInference, nodes::Array{Node}
     number_of_nodes = length(nodes)
     edges = Array{Edge}(undef, binomial(number_of_nodes, 2))
 
-    # Get the raw scores (Unchanged logic; just forward config)
-    scores = get_puc(inference) ?
-        get_puc_scores(nodes, number_of_nodes, estimator, base; config = config) :
-        get_mi_scores(nodes, number_of_nodes, estimator, base; config = config)
+    # # Get the raw scores (Unchanged logic; just forward config)
+    # scores = get_puc(inference) ?
+    #     get_puc_scores(nodes, number_of_nodes, estimator, base; config = config) :
+    #     get_mi_scores(nodes, number_of_nodes, estimator, base; config = config)
+    # Get raw scores
+    if get_puc(inference)
+        mi_scores, scores = get_puc_scores(
+            nodes, number_of_nodes, estimator, base; config = config
+        )
 
+        # Only dump MI for PIDC (not PUC)
+        if isa(inference, PIDCNetworkInference) && config.dump_mi_path !== nothing
+            dump_mi_scores(mi_scores, nodes, config)
+        end
+    else
+        scores = get_mi_scores(
+            nodes, number_of_nodes, estimator, base; config = config
+        )
+    end
+    
     # Apply context if necessary
     if apply_context(inference)
         weights = get_weights(inference, scores, number_of_nodes, nodes)
