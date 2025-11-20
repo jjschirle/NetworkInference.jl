@@ -77,34 +77,6 @@ end
     @test net1.edges[1].weight == net2.edges[1].weight
 end
 
-# @testset "Toy 1kx200 determinism + timings, MI Batch" begin
-#     # Use the same data dir constant as above
-#     toy_path = joinpath(DATA_DIR, "toy_1k_200.txt")
-
-#     # Legacy config: no MI tiling, no PUC block optimizations
-#     cfg_legacy  = PIDCConfig(batch_size_genes = 0,  triplet_block_k = 0)
-
-#     # Batched MI only (same PUC behavior as legacy)
-#     cfg_batched = PIDCConfig(batch_size_genes = 64, triplet_block_k = 0)
-
-#     # Legacy timing
-#     t_legacy = @timed run_all_networks(toy_path; config = cfg_legacy)
-
-#     # Batched MI timing
-#     t_batched = @timed run_all_networks(toy_path; config = cfg_batched)
-
-#     @info "Toy legacy vs batched timings (s)" legacy = t_legacy.time batched = t_batched.time
-#     @info "Toy legacy vs batched allocations (bytes)" legacy = t_legacy.bytes batched = t_batched.bytes
-
-#     open(TIMINGS_PATH, "a") do io
-#         println(io, "toy1k_200_mi_legacy\t$(t_legacy.time)\t$(t_legacy.bytes)")
-#         println(io, "toy1k_200_mi_batched\t$(t_batched.time)\t$(t_batched.bytes)")
-#     end
-
-#     # No assertion here: this is a performance *probe*, not a correctness test.
-#     # We'll use it to guide tuning on larger, realistic datasets.
-# end
-
 @testset "Pruned PUC matches full when k >= n (union mode)" begin
     data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
     nodes = get_nodes(data_file)
@@ -236,25 +208,6 @@ end
 
 
 # --------- LARGE TESTS --------
-
-# @testset "Large toy MI timing" begin
-#     large_file = joinpath(DATA_DIR, "toy_large_2k.txt")
-
-#     cfg_legacy  = PIDCConfig(batch_size_genes = 0,  triplet_block_k = 0)
-#     cfg_batched = PIDCConfig(batch_size_genes = 128, triplet_block_k = 0)
-
-#     t_legacy = @timed run_all_networks(large_file; config = cfg_legacy)
-#     t_batched = @timed run_all_networks(large_file; config = cfg_batched)
-
-#     @info "Large toy MI timings (s)" legacy = t_legacy.time batched = t_batched.time
-#     @info "Large toy MI allocations (bytes)" legacy = t_legacy.bytes batched = t_batched.bytes
-
-#     open(TIMINGS_PATH, "a") do io
-#         println(io, "toy2k_mi_legacy\t$(t_legacy.time)\t$(t_legacy.bytes)")
-#         println(io, "toy2k_mi_batched\t$(t_batched.time)\t$(t_batched.bytes)")
-#     end
-# end
-
 
 # @testset "Large toy PUC timing" begin
 #     large_file = joinpath(DATA_DIR, "toy_large_1k.txt")

@@ -28,7 +28,6 @@ export
 include("common.jl")
 export PIDCConfig # New addition
 
-include("mi_batched.jl")
 include("puc_full.jl")
 include("puc_pruned.jl")
 include("puc_pruned_dist.jl")

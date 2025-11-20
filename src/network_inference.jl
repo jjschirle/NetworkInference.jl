@@ -50,13 +50,6 @@ end
 # Gets the mutual information between all pairs of Nodes.
 function get_mi_scores(nodes, number_of_nodes, estimator, base; config::PIDCConfig = PIDCConfig())
 
-    # Batched MI routing
-    # Avoids ~ n(n-1)/2 small array allocations, and sending work to @distributed workers
-    if config.batch_size_genes > 0
-        # Use batched implementation
-        return compute_mi_batched(nodes; estimator = estimator, base = base, config = config)
-    end
-
     # Legacy path
     function get_mi(node1, node2, i, j, base, mi_scores)
         probabilities, probabilities1, probabilities2 = get_joint_probabilities(node1, node2, estimator)

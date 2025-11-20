@@ -19,7 +19,6 @@ end
 # --- PIDC configuration -------------------------------------------
 Base.@kwdef struct PIDCConfig
     n_threads::Int = Threads.nthreads()         # reserved for adjusting threading vs processing
-    batch_size_genes::Int = 0                   # MI tiling (0 -> legacy path), 0 = use original MI path by default
     triplet_block_k::Int = 0                    # 0 => full PUC (Stage 3A), >0 => pruned PUC
     neighbor_mode::Symbol = :union              # :union (default) or :target
     triplet_backend::Symbol = :threads          # :threads (default) or :distributed
