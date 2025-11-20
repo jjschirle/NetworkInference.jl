@@ -7,7 +7,7 @@ const OUT_DIR  = joinpath(dirname(@__FILE__), "baseline_outputs")
 isdir(OUT_DIR) || mkpath(OUT_DIR)
 
 @testset "MI dump for PIDC" begin
-    data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
+    data_file = joinpath(DATA_DIR, "toy_small_200.txt")
     out_file  = joinpath(OUT_DIR, "toy_mi_dump.tsv")
 
     # Clean up from previous runs
