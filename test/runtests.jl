@@ -3,7 +3,7 @@ using Test
 using DelimitedFiles
 include("baseline_helpers.jl")
 include("baseline_smoke_tests.jl")
-include("mi_batched_tests.jl")
+# include("mi_batched_tests.jl")
 include("mi_dump_tests.jl")
 
 

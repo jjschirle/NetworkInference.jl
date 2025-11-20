@@ -7,6 +7,8 @@ const DATA_DIR = joinpath(dirname(@__FILE__), "data")
 const OUT_DIR  = joinpath(dirname(@__FILE__), "baseline_outputs")
 isdir(OUT_DIR) || mkpath(OUT_DIR)
 
+const TIMINGS_PATH = joinpath(OUT_DIR, "timings.tsv")
+
 # --- Small yeast dataset: mirror current tests and save snapshots ---
 @testset "Yeast10 baseline snapshots" begin
     data_file = joinpath(DATA_DIR, "yeast1_10_data.txt")
@@ -18,8 +20,8 @@ isdir(OUT_DIR) || mkpath(OUT_DIR)
     BaselineHelpers.save_edges_tsv(joinpath(OUT_DIR, "pidc_yeast_edges.tsv"), pidc_net)
 end
 
-# --- Toy 1k×200 dataset: determinism + timings/allocations ---
-@testset "Toy 1k×200 determinism + timings" begin
+# --- Toy 1kx200 dataset: determinism + timings/allocations ---
+@testset "Toy 1kx200 determinism + timings" begin
     data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
 
     # First run
@@ -56,14 +58,15 @@ end
     BaselineHelpers.save_edges_tsv(joinpath(OUT_DIR, "pidc_toy_edges.tsv"), pidc1)
 
     # Log timings/allocations to a simple TSV
-    open(joinpath(OUT_DIR, "timings.tsv"), "w") do io
+    open(TIMINGS_PATH, "w") do io
         println(io, "phase\twall_seconds\talloc_bytes")
-        println(io, "toy_first\t$(t1.time)\t$(t1.bytes)")
-        println(io, "toy_second\t$(t2.time)\t$(t2.bytes)")
+        println(io, "toy1k_200_first\t$(t1.time)\t$(t1.bytes)")
+        println(io, "toy1k_200_second\t$(t2.time)\t$(t2.bytes)")
     end
 
     @info "Toy timings (s)" first=t1.time second=t2.time
     @info "Toy allocations (bytes)" first=t1.bytes second=t2.bytes
+
 end
 
 @testset "Config is backward compatible" begin
@@ -74,30 +77,35 @@ end
     @test net1.edges[1].weight == net2.edges[1].weight
 end
 
-@testset "Toy 1kx200 determinism + timings" begin
-    # Use the same data dir constant as above
-    toy_path = joinpath(DATA_DIR, "toy_1k_200.txt")
+# @testset "Toy 1kx200 determinism + timings, MI Batch" begin
+#     # Use the same data dir constant as above
+#     toy_path = joinpath(DATA_DIR, "toy_1k_200.txt")
 
-    # Legacy config: no MI tiling, no PUC block optimizations
-    cfg_legacy  = PIDCConfig(batch_size_genes = 0,  triplet_block_k = 0)
+#     # Legacy config: no MI tiling, no PUC block optimizations
+#     cfg_legacy  = PIDCConfig(batch_size_genes = 0,  triplet_block_k = 0)
 
-    # Batched MI only (same PUC behavior as legacy)
-    cfg_batched = PIDCConfig(batch_size_genes = 64, triplet_block_k = 0)
+#     # Batched MI only (same PUC behavior as legacy)
+#     cfg_batched = PIDCConfig(batch_size_genes = 64, triplet_block_k = 0)
 
-    # Legacy timing
-    t_legacy = @timed run_all_networks(toy_path; config = cfg_legacy)
+#     # Legacy timing
+#     t_legacy = @timed run_all_networks(toy_path; config = cfg_legacy)
 
-    # Batched MI timing
-    t_batched = @timed run_all_networks(toy_path; config = cfg_batched)
+#     # Batched MI timing
+#     t_batched = @timed run_all_networks(toy_path; config = cfg_batched)
 
-    @info "Toy legacy vs batched timings (s)" legacy = t_legacy.time batched = t_batched.time
-    @info "Toy legacy vs batched allocations (bytes)" legacy = t_legacy.bytes batched = t_batched.bytes
+#     @info "Toy legacy vs batched timings (s)" legacy = t_legacy.time batched = t_batched.time
+#     @info "Toy legacy vs batched allocations (bytes)" legacy = t_legacy.bytes batched = t_batched.bytes
 
-    # No assertion here: this is a performance *probe*, not a correctness test.
-    # We'll use it to guide tuning on larger, realistic datasets.
-end
+#     open(TIMINGS_PATH, "a") do io
+#         println(io, "toy1k_200_mi_legacy\t$(t_legacy.time)\t$(t_legacy.bytes)")
+#         println(io, "toy1k_200_mi_batched\t$(t_batched.time)\t$(t_batched.bytes)")
+#     end
 
-@testset "Pruned PUC matches full when k >= n" begin
+#     # No assertion here: this is a performance *probe*, not a correctness test.
+#     # We'll use it to guide tuning on larger, realistic datasets.
+# end
+
+@testset "Pruned PUC matches full when k >= n (union mode)" begin
     data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
     nodes = get_nodes(data_file)
 
@@ -120,7 +128,7 @@ end
     end
 end
 
-@testset "Pruned PUC timing (toy 1k×200)" begin
+@testset "Pruned PUC timing (union mode, toy 1kx200)" begin
     data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
     cfg_full   = PIDCConfig(triplet_block_k = 0)
     cfg_pruned = PIDCConfig(triplet_block_k = 20, neighbor_mode = :union)
@@ -137,6 +145,11 @@ end
 
     @info "PUC timing (toy)" full = t_full.time pruned = t_pruned.time
     @info "PUC allocations (toy)" full = t_full.bytes pruned = t_pruned.bytes
+
+    open(TIMINGS_PATH, "a") do io
+        println(io, "toy1k_200_puc_full_union\t$(t_full.time)\t$(t_full.bytes)")
+        println(io, "toy1k_200_puc_pruned_union\t$(t_pruned.time)\t$(t_pruned.bytes)")
+    end
 
     # Soft assertion:
     # @test t_pruned.time <= 1.2 * t_full.time
@@ -164,7 +177,7 @@ end
 end
 
 
-@testset "Pruned PUC timing (target mode, toy 1k×200)" begin
+@testset "Pruned PUC timing (target mode, toy 1kx200)" begin
     data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
 
     cfg_full = PIDCConfig(triplet_block_k = 0)
@@ -183,6 +196,71 @@ end
     @info "PUC timing (target mode, toy)" full = t_full.time target = t_tar.time
     @info "PUC allocations (target mode, toy)" full = t_full.bytes target = t_tar.bytes
 
+    open(TIMINGS_PATH, "a") do io
+        println(io, "toy1k_200_puc_full_target\t$(t_full.time)\t$(t_full.bytes)")
+        println(io, "toy1k_200_puc_pruned_target\t$(t_tar.time)\t$(t_tar.bytes)")
+    end
+
     # Soft assertion:
     # @test t_tar.time <= 1.2 * t_full.time
+end
+
+
+# --------- LARGE TESTS --------
+
+# @testset "Large toy MI timing" begin
+#     large_file = joinpath(DATA_DIR, "toy_large_2k.txt")
+
+#     cfg_legacy  = PIDCConfig(batch_size_genes = 0,  triplet_block_k = 0)
+#     cfg_batched = PIDCConfig(batch_size_genes = 128, triplet_block_k = 0)
+
+#     t_legacy = @timed run_all_networks(large_file; config = cfg_legacy)
+#     t_batched = @timed run_all_networks(large_file; config = cfg_batched)
+
+#     @info "Large toy MI timings (s)" legacy = t_legacy.time batched = t_batched.time
+#     @info "Large toy MI allocations (bytes)" legacy = t_legacy.bytes batched = t_batched.bytes
+
+#     open(TIMINGS_PATH, "a") do io
+#         println(io, "toy2k_mi_legacy\t$(t_legacy.time)\t$(t_legacy.bytes)")
+#         println(io, "toy2k_mi_batched\t$(t_batched.time)\t$(t_batched.bytes)")
+#     end
+# end
+
+
+@testset "Large toy PUC timing" begin
+    large_file = joinpath(DATA_DIR, "toy_large_1k.txt")
+
+    cfg_full   = PIDCConfig(triplet_block_k = 0)
+    cfg_union  = PIDCConfig(triplet_block_k = 20, neighbor_mode = :union)
+    cfg_target = PIDCConfig(triplet_block_k = 20, neighbor_mode = :target)
+
+    @info "PUC legacy begin" 
+    t_full = @timed begin
+        _mi, _clr, _puc, pidc_full = run_all_networks(large_file; config = cfg_full)
+        pidc_full
+    end
+    @info "\tPUC legacy finished" 
+    
+    @info "PUC union mode begin" 
+    t_union = @timed begin
+        _mi, _clr, _puc, pidc_union = run_all_networks(large_file; config = cfg_union)
+        pidc_union
+    end
+    @info "\tPUC union mode finished" 
+    
+    @info "PUC target mode begin" 
+    t_target = @timed begin
+        _mi, _clr, _puc, pidc_target = run_all_networks(large_file; config = cfg_target)
+        pidc_target
+    end
+    @info "\tPUC target mode finished" 
+
+    @info "Large toy PUC timings (s)" full = t_full.time union = t_union.time target = t_target.time
+    @info "Large toy PUC allocations (bytes)" full = t_full.bytes union = t_union.bytes target = t_target.bytes
+
+    open(TIMINGS_PATH, "a") do io
+        println(io, "toy_large_1k_puc_full\t$(t_full.time)\t$(t_full.bytes)")
+        println(io, "toy_large_1k_puc_pruned_union\t$(t_union.time)\t$(t_union.bytes)")
+        println(io, "toy_large_1k_puc_pruned_target\t$(t_target.time)\t$(t_target.bytes)")
+    end
 end
