@@ -31,6 +31,7 @@ export PIDCConfig # New addition
 include("mi_batched.jl")
 include("puc_full.jl")
 include("puc_pruned.jl")
+include("puc_pruned_dist.jl")
 include("mi_dump.jl") 
 include("network_inference.jl")
 include("infer_network.jl")

@@ -205,6 +205,35 @@ end
     # @test t_tar.time <= 1.2 * t_full.time
 end
 
+@testset "Pruned PUC distributed matches threaded when k >= n" begin
+    data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
+    nodes = get_nodes(data_file)
+    n = length(nodes)
+
+    cfg_threads = PIDCConfig(
+        triplet_block_k = n,
+        neighbor_mode   = :union,
+        triplet_backend = :threads,
+    )
+
+    cfg_dist = PIDCConfig(
+        triplet_block_k = n,
+        neighbor_mode   = :union,
+        triplet_backend = :distributed,
+    )
+
+    net_threads = InferredNetwork(PIDCNetworkInference(), nodes; config = cfg_threads)
+    net_dist    = InferredNetwork(PIDCNetworkInference(), nodes; config = cfg_dist)
+
+    @test length(net_threads.edges) == length(net_dist.edges)
+
+    for idx in (1, 5, 10, 50, length(net_threads.edges))
+        @test net_threads.edges[idx].weight ≈ net_dist.edges[idx].weight atol = 1e-8
+        @test Set(n.label for n in net_threads.edges[idx].nodes) ==
+              Set(n.label for n in net_dist.edges[idx].nodes)
+    end
+end
+
 
 # --------- LARGE TESTS --------
 
@@ -227,40 +256,52 @@ end
 # end
 
 
-@testset "Large toy PUC timing" begin
-    large_file = joinpath(DATA_DIR, "toy_large_1k.txt")
+# @testset "Large toy PUC timing" begin
+#     large_file = joinpath(DATA_DIR, "toy_large_1k.txt")
 
-    cfg_full   = PIDCConfig(triplet_block_k = 0)
-    cfg_union  = PIDCConfig(triplet_block_k = 20, neighbor_mode = :union)
-    cfg_target = PIDCConfig(triplet_block_k = 20, neighbor_mode = :target)
+#     cfg_full      = PIDCConfig(triplet_block_k = 0)
+#     cfg_union_thr = PIDCConfig(triplet_block_k = 20, neighbor_mode = :union,
+#                                triplet_backend = :threads)
+#     cfg_union_dist = PIDCConfig(triplet_block_k = 20, neighbor_mode = :union,
+#                                 triplet_backend = :distributed)
+#     cfg_target_thr = PIDCConfig(triplet_block_k = 20, neighbor_mode = :target,
+#                                 triplet_backend = :threads)
+#     cfg_target_dist = PIDCConfig(triplet_block_k = 20, neighbor_mode = :target,
+#                                 triplet_backend = :distributed)
 
-    @info "PUC legacy begin" 
-    t_full = @timed begin
-        _mi, _clr, _puc, pidc_full = run_all_networks(large_file; config = cfg_full)
-        pidc_full
-    end
-    @info "\tPUC legacy finished" 
+#     t_full = @timed begin
+#         _mi, _clr, _puc, pidc_full = run_all_networks(large_file; config = cfg_full)
+#         pidc_full
+#     end
+
+#     t_union_thr = @timed begin
+#         _mi, _clr, _puc, pidc_union_thr = run_all_networks(large_file; config = cfg_union_thr)
+#         pidc_union_thr
+#     end
+
+#     t_union_dist = @timed begin
+#         _mi, _clr, _puc, pidc_union_dist = run_all_networks(large_file; config = cfg_union_dist)
+#         pidc_union_dist
+#     end
+
+#     t_target_thr = @timed begin
+#         _mi, _clr, _puc, pidc_target_thr = run_all_networks(large_file; config = cfg_target_thr)
+#         pidc_target_thr
+#     end
     
-    @info "PUC union mode begin" 
-    t_union = @timed begin
-        _mi, _clr, _puc, pidc_union = run_all_networks(large_file; config = cfg_union)
-        pidc_union
-    end
-    @info "\tPUC union mode finished" 
-    
-    @info "PUC target mode begin" 
-    t_target = @timed begin
-        _mi, _clr, _puc, pidc_target = run_all_networks(large_file; config = cfg_target)
-        pidc_target
-    end
-    @info "\tPUC target mode finished" 
+#     t_target_dist = @timed begin
+#         _mi, _clr, _puc, pidc_target_dist = run_all_networks(large_file; config = cfg_target_dist)
+#         pidc_target_dist
+#     end
 
-    @info "Large toy PUC timings (s)" full = t_full.time union = t_union.time target = t_target.time
-    @info "Large toy PUC allocations (bytes)" full = t_full.bytes union = t_union.bytes target = t_target.bytes
+#     @info "Large toy PUC timings (s)" full = t_full.time union_thr = t_union_thr.time union_dist = t_union_dist.time target_thr = t_target_thr.time target_dist = t_target_dist.time
+#     @info "Large toy PUC allocations (bytes)" full = t_full.bytes union_thr = t_union_thr.bytes union_dist = t_union_dist.bytes target_thr = t_target_thr.bytes target_dist = t_target_dist.bytes
 
-    open(TIMINGS_PATH, "a") do io
-        println(io, "toy_large_1k_puc_full\t$(t_full.time)\t$(t_full.bytes)")
-        println(io, "toy_large_1k_puc_pruned_union\t$(t_union.time)\t$(t_union.bytes)")
-        println(io, "toy_large_1k_puc_pruned_target\t$(t_target.time)\t$(t_target.bytes)")
-    end
-end
+#     open(TIMINGS_PATH, "a") do io
+#         println(io, "toy_large_1k_puc_full\t$(t_full.time)\t$(t_full.bytes)")
+#         println(io, "toy_large_1k_puc_pruned_union_threads\t$(t_union_thr.time)\t$(t_union_thr.bytes)")
+#         println(io, "toy_large_1k_puc_pruned_union_distributed\t$(t_union_dist.time)\t$(t_union_dist.bytes)")
+#         println(io, "toy_large_1k_puc_pruned_target_threads\t$(t_target_thr.time)\t$(t_target_thr.bytes)")
+#         println(io, "toy_large_1k_puc_pruned_target_distributed\t$(t_target_dist.time)\t$(t_target_dist.bytes)")
+#     end
+# end

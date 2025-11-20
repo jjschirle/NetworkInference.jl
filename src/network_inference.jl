@@ -93,8 +93,15 @@ end
 function get_puc_scores(nodes, number_of_nodes, estimator, base;
     config::PIDCConfig = PIDCConfig())
     if config.triplet_block_k > 0
-        return compute_puc_pruned(nodes; estimator = estimator, base = base, config = config)
+        # Pruned PUC
+        if config.triplet_backend == :distributed
+            return compute_puc_pruned_dist(nodes; estimator = estimator, base = base, config = config)
+        else
+            # default: threads
+            return compute_puc_pruned( nodes; estimator = estimator, base = base, config = config)
+        end
     else
+        # Full PUC (no pruning)
         return compute_puc_full(nodes; estimator = estimator, base = base, config = config)
     end
 end

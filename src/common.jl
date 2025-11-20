@@ -21,7 +21,8 @@ Base.@kwdef struct PIDCConfig
     n_threads::Int = Threads.nthreads()         # reserved for adjusting threading vs processing
     batch_size_genes::Int = 0                   # MI tiling (0 -> legacy path), 0 = use original MI path by default
     triplet_block_k::Int = 0                    # 0 => full PUC (Stage 3A), >0 => pruned PUC
-    neighbor_mode::Symbol = :union              # :union (Option A, default) or :target (Option B later)
+    neighbor_mode::Symbol = :union              # :union (default) or :target
+    triplet_backend::Symbol = :threads          # :threads (default) or :distributed
     topk_edges::Int = 0                         # reserved for candidate-edge-only PUC
     discretizer::String = "bayesian_blocks"     # mirrors existing default
     estimator::String = "maximum_likelihood"    # mirrors existing default
