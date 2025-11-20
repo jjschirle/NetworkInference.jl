@@ -3,10 +3,8 @@
 # Pruned PUC: use MI-based k-neighborhoods instead of all triplets.
 # This is opt-in via PIDCConfig.triplet_block_k > 0.
 #
-# Option A (edge-centric, neighbor_mode = :union):
-# For each unordered pair (x, z), use K(x,z) = N(x) ∪ N(z) as third-gene
-# candidates. When k >= n-1, this reproduces the full PUC exactly (up to FP
-# roundoff), because K(x,z) then contains all y ≠ x,z.
+# neighbor_mode = :union  -> Option A (edge-centric, union-of-neighbors)
+# neighbor_mode = :target -> Option B (target-centric)
 
 function compute_puc_pruned(nodes::Vector{Node};
     estimator::String = "maximum_likelihood",
@@ -16,8 +14,8 @@ function compute_puc_pruned(nodes::Vector{Node};
     n = length(nodes)
     k = min(config.triplet_block_k, max(n - 1, 0))
 
-    # If k == 0, or we haven't implemented this neighbor_mode yet, fall back.
-    if k == 0 || config.neighbor_mode != :union
+    # Fallback if pruning is disabled
+    if k == 0
         return compute_puc_full(nodes; estimator = estimator, base = base)
     end
 
@@ -81,35 +79,39 @@ function compute_puc_pruned(nodes::Vector{Node};
         scores[z, x] += puc_score
     end
 
-    # --- neighbor-based triplet loop (Option A: union of neighbors) --
+    # --- neighbor-based triplet loop --------------------------------
 
+    mode = getfield(config, :neighbor_mode)
+
+    if mode == :union
+    # ---------------------- Option A: edge-centric ----------------------
     # We parallelize over x; each (x,z) pair is handled exactly once with z > x,
     # and we always update (x,z) & (z,x) together, so there are no write races.
     Threads.@threads for x in 1:n
         for z in x+1:n
-        # Build candidate set K(x,z) = neighbors[x] ∪ neighbors[z]
-        # (deduplicated, excluding x and z). We do this via sort + unique
-        # to avoid heavy Set allocations, since |neighbors| ≤ 2k.
-        cands = Vector{Int}()
-        sizehint!(cands, length(neighbors[x]) + length(neighbors[z]))
-        append!(cands, neighbors[x])
-        append!(cands, neighbors[z])
-        sort!(cands)
+            # Build candidate set K(x,z) = neighbors[x] ∪ neighbors[z]
+            # (deduplicated, excluding x and z). We do this via sort + unique
+            # to avoid heavy Set allocations, since |neighbors| ≤ 2k.
+            cands = Vector{Int}()
+            sizehint!(cands, length(neighbors[x]) + length(neighbors[z]))
+            append!(cands, neighbors[x])
+            append!(cands, neighbors[z])
+            sort!(cands)
 
-        last = 0
-        for y in cands
-            # Skip duplicates and self-pairs
-            if y == last || y == x || y == z
-                last = y
-                continue
+            last = 0
+            for y in cands
+                # Skip duplicates and self-pairs
+                if y == last || y == x || y == z
+                    last = y
+                    continue
             end
             last = y
 
-            # --- Contribution 1: target = z, sources = (x, y) ----------
+            # --- Contribution 1: target = z, sources = (x, y)
             # This matches legacy:
             # get_puc(nodes[z], node_pairs[x,z], node_pairs[y,z], x, y, z, puc_scores)
-            np_xz = node_pairs[x, z]   # source = x, target = z
-            np_yz = node_pairs[y, z]   # source = y, target = z
+            np_xz = node_pairs[x, z] # source = x, target = z
+            np_yz = node_pairs[y, z] # source = y, target = z
 
             Rz = apply_redundancy_formula(
             nodes[z].probabilities,
@@ -118,14 +120,14 @@ function compute_puc_pruned(nodes::Vector{Node};
             base
             )
             increment_puc_scores!(x, z, np_xz.mi, Rz, puc_scores)
-
+            
             # --- Contribution 2: target = x, sources = (y, z) ----------
             # This matches legacy:
             # get_puc(nodes[x], node_pairs[y,x], node_pairs[z,x], y, z, x, puc_scores)
             # which increments PUC(y,x) with mi(y,x) and PUC(z,x) with mi(z,x).
             # For the pair (x,z), we care about the second one (mi(z,x)).
-            np_yx = node_pairs[y, x]   # source = y, target = x
-            np_zx = node_pairs[z, x]   # source = z, target = x
+            np_yx = node_pairs[y, x]
+            np_zx = node_pairs[z, x]
 
             Rx = apply_redundancy_formula(
             nodes[x].probabilities,
@@ -136,6 +138,57 @@ function compute_puc_pruned(nodes::Vector{Node};
             increment_puc_scores!(x, z, np_zx.mi, Rx, puc_scores)
             end
         end
+    end
+
+    elseif mode == :target
+    # ---------------------- Option B: target-centric --------------------
+    #
+    # For an edge (x,z):
+    #   - Redundancy around z uses ONLY neighbors[z] as candidate y.
+    #   - Redundancy around x uses ONLY neighbors[x] as candidate y.
+    #
+    # When k >= n-1, neighbors[t] contains all other genes, so this
+    # reproduces full PUC exactly (every triple {x,y,z} is seen once
+    # for target=z and once for target=x, as in compute_puc_full).
+
+    Threads.@threads for x in 1:n
+        for z in x+1:n
+            # --- target = z, sources = (x, y), y in neighbors[z] ----------
+            for y in neighbors[z]
+                (y == x || y == z) && continue
+
+                np_xz = node_pairs[x, z]
+                np_yz = node_pairs[y, z]
+
+                Rz = apply_redundancy_formula(
+                nodes[z].probabilities,
+                np_xz.si,
+                np_yz.si,
+                base
+                )
+                increment_puc_scores!(x, z, np_xz.mi, Rz, puc_scores)
+            end
+
+                # --- target = x, sources = (y, z), y in neighbors[x] ----------
+                for y in neighbors[x]
+                    (y == x || y == z) && continue
+
+                    np_yx = node_pairs[y, x]
+                    np_zx = node_pairs[z, x]
+
+                    Rx = apply_redundancy_formula(
+                    nodes[x].probabilities,
+                    np_yx.si,
+                    np_zx.si,
+                    base
+                    )
+                    increment_puc_scores!(x, z, np_zx.mi, Rx, puc_scores)
+                end
+            end
+        end
+
+    else
+        error("Unknown neighbor_mode = $(mode); expected :union or :target")
     end
 
     return puc_scores

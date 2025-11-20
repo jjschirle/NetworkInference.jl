@@ -141,3 +141,48 @@ end
     # Soft assertion:
     # @test t_pruned.time <= 1.2 * t_full.time
 end
+
+@testset "Pruned PUC (target mode) matches full when k >= n" begin
+    data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
+    nodes = get_nodes(data_file)
+    n = length(nodes)
+
+    cfg_full = PIDCConfig(triplet_block_k = 0)  # full PUC
+    cfg_tar  = PIDCConfig(triplet_block_k = n,
+                          neighbor_mode     = :target)
+
+    net_full = InferredNetwork(PIDCNetworkInference(), nodes; config = cfg_full)
+    net_tar  = InferredNetwork(PIDCNetworkInference(), nodes; config = cfg_tar)
+
+    @test length(net_full.edges) == length(net_tar.edges)
+
+    for idx in (1, 5, 10, 50, length(net_full.edges))
+        @test net_full.edges[idx].weight ≈ net_tar.edges[idx].weight atol = 1e-8
+        @test Set(n.label for n in net_full.edges[idx].nodes) ==
+              Set(n.label for n in net_tar.edges[idx].nodes)
+    end
+end
+
+
+@testset "Pruned PUC timing (target mode, toy 1k×200)" begin
+    data_file = joinpath(DATA_DIR, "toy_1k_200.txt")
+
+    cfg_full = PIDCConfig(triplet_block_k = 0)
+    cfg_tar  = PIDCConfig(triplet_block_k = 20, neighbor_mode = :target)
+
+    t_full = @timed begin
+        _mi, _clr, _puc, pidc_full = run_all_networks(data_file; config = cfg_full)
+        pidc_full
+    end
+
+    t_tar = @timed begin
+        _mi, _clr, _puc, pidc_tar = run_all_networks(data_file; config = cfg_tar)
+        pidc_tar
+    end
+
+    @info "PUC timing (target mode, toy)" full = t_full.time target = t_tar.time
+    @info "PUC allocations (target mode, toy)" full = t_full.bytes target = t_tar.bytes
+
+    # Soft assertion:
+    # @test t_tar.time <= 1.2 * t_full.time
+end
