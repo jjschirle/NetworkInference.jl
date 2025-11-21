@@ -1,6 +1,7 @@
 using Test, DelimitedFiles
 using .BaselineHelpers
 using NetworkInference
+using Distributed
 
 # Paths
 const DATA_DIR = joinpath(dirname(@__FILE__), "data")

@@ -1,6 +1,18 @@
-using NetworkInference
+using Distributed
+
+# Add workers if not already present
+if nprocs() == 1
+    addprocs(4)
+end
+
+# Make sure all workers load the package
+@everywhere using NetworkInference
+
+@info "Parallel config" nthreads = Threads.nthreads() nprocs = nprocs() workers = workers()
+
 using Test
 using DelimitedFiles
+
 include("baseline_helpers.jl")
 include("baseline_smoke_tests.jl")
 include("mi_dump_tests.jl")
