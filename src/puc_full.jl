@@ -3,6 +3,7 @@
 # Full, legacy PUC computation over all triplets (no pruning).
 # This is factored out so we can later add pruned / block-based variants.
 # Only change is outputting pairwise MI
+using SharedArrays
 
 function compute_puc_full(nodes::Vector{Node};
     estimator::String = "maximum_likelihood",
@@ -47,15 +48,15 @@ function compute_puc_full(nodes::Vector{Node};
 
     # Add contribution of one redundancy computation to PUC scores
     function increment_puc_scores!(x::Int, z::Int,
-                mi::Float64,
-                redundancy::Float64,
-                puc_scores::Matrix{Float64})
+            mi::Float64,
+            redundancy::Float64,
+            puc_scores::AbstractMatrix{Float64})
         puc_score = (mi - redundancy) / mi
-        # Clamp to [0, ∞) and zero on non-finite
         puc_score = isfinite(puc_score) && puc_score >= 0 ? puc_score : zero(puc_score)
         puc_scores[x,z] += puc_score
         puc_scores[z,x] += puc_score
     end
+
 
     # Compute redundancy for a given target and its two sources,
     # then update PUC(x,z) and PUC(y,z)
@@ -94,7 +95,9 @@ function compute_puc_full(nodes::Vector{Node};
     # --- Allocate caches -------------------------------------------------------
 
     node_pairs = Array{NodePair}(undef, number_of_nodes, number_of_nodes)
-    puc_scores = zeros(Float64, number_of_nodes, number_of_nodes)
+    puc_scores = SharedArray{Float64}(number_of_nodes, number_of_nodes)
+    fill!(puc_scores, 0.0)
+
 
     # --- pairwise MI + SI cache --------------------------------------
 
@@ -106,18 +109,28 @@ function compute_puc_full(nodes::Vector{Node};
 
     # --- full triplet enumeration (legacy behavior) ------------------
 
-    for i in 1:number_of_nodes
-        for j in i+1:number_of_nodes
-            for k in j+1:number_of_nodes
-                # target = k
-                get_puc!(nodes[k], node_pairs[i,k], node_pairs[j,k], i, j, k, puc_scores)
-                # target = j
-                get_puc!(nodes[j], node_pairs[i,j], node_pairs[k,j], i, k, j, puc_scores)
-                # target = i
-                get_puc!(nodes[i], node_pairs[j,i], node_pairs[k,i], j, k, i, puc_scores)
+    @sync @distributed for x in 1:number_of_nodes
+        for z in x+1:number_of_nodes
+            for y in 1:number_of_nodes
+                (y == x || y == z) && continue
+    
+                # target = z
+                np_xz = node_pairs[x,z]
+                np_yz = node_pairs[y,z]
+                Rz = apply_redundancy_formula(nodes[z].probabilities,
+                                              np_xz.si, np_yz.si, base)
+                increment_puc_scores!(x, z, np_xz.mi, Rz, puc_scores)
+    
+                # target = x
+                np_yx = node_pairs[y,x]
+                np_zx = node_pairs[z,x]
+                Rx = apply_redundancy_formula(nodes[x].probabilities,
+                                              np_yx.si, np_zx.si, base)
+                increment_puc_scores!(x, z, np_zx.mi, Rx, puc_scores)
             end
         end
     end
+    
 
-    return mi_scores, puc_scores
+    return mi_scores, Array(puc_scores)
 end
